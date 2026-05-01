@@ -1,0 +1,1264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pharos — IsoBaraSAM</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+    :root {
+      --bg: #030912;
+      --panel: #0a1628;
+      --panel-soft: #0f1e38;
+      --panel-mid: #091423;
+      --ink: #e2eaf8;
+      --ink-dim: #a8bcd8;
+      --muted: #5a7090;
+      --line: rgba(0,210,255,0.10);
+      --cyan: #00d4ff;
+      --cyan-glow: rgba(0,212,255,0.18);
+      --violet: #7b61ff;
+      --violet-glow: rgba(123,97,255,0.18);
+      --gold: #f0c040;
+      --gold-glow: rgba(240,192,64,0.15);
+      --green: #34d399;
+      --shadow: 0 24px 80px rgba(0,0,0,0.6);
+      --shadow-cyan: 0 0 40px rgba(0,212,255,0.12);
+      --radius-xl: 28px;
+      --radius-lg: 22px;
+      --radius-md: 16px;
+      --radius-sm: 12px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Manrope', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      padding: 20px;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Ambient background */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 10% 0%, rgba(0,212,255,0.07) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 50% at 90% 100%, rgba(123,97,255,0.07) 0%, transparent 60%),
+        radial-gradient(ellipse 40% 40% at 50% 50%, rgba(0,20,60,0.4) 0%, transparent 100%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .page {
+      position: relative;
+      z-index: 1;
+      width: min(1340px, 100%);
+      margin: 0 auto;
+      display: grid;
+      gap: 20px;
+    }
+
+    /* ─── TOPBAR ─── */
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      background: rgba(10,22,40,0.85);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(0,212,255,0.12);
+      border-radius: 999px;
+      padding: 12px 20px;
+      box-shadow: var(--shadow), var(--shadow-cyan);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 900;
+      font-size: 16px;
+      letter-spacing: -0.04em;
+      color: var(--ink);
+    }
+
+    .brand-mark {
+      position: relative;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .brand-mark::before {
+      content: '⚓';
+      font-size: 18px;
+      line-height: 1;
+      filter: drop-shadow(0 0 8px var(--cyan));
+    }
+
+    .brand-sub {
+      font-size: 11px;
+      color: var(--cyan);
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .top-pills {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .pill {
+      border-radius: 999px;
+      padding: 7px 14px;
+      background: rgba(0,212,255,0.06);
+      border: 1px solid rgba(0,212,255,0.15);
+      font-size: 11px;
+      color: var(--cyan);
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+
+    .pill.live {
+      background: rgba(52,211,153,0.08);
+      border-color: rgba(52,211,153,0.2);
+      color: var(--green);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .pill.live::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 6px var(--green);
+      animation: pulse-dot 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.8); }
+    }
+
+    /* ─── PANELS ─── */
+    .panel {
+      background: var(--panel);
+      border: 1px solid rgba(0,212,255,0.08);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow);
+      padding: 30px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .panel::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(0,212,255,0.25), transparent);
+    }
+
+    /* ─── HERO ─── */
+    .hero {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 20px;
+    }
+
+    .hero-main {
+      min-height: 460px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      background:
+        radial-gradient(ellipse at top left, rgba(0,212,255,0.06) 0%, transparent 60%),
+        var(--panel);
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      width: fit-content;
+      align-items: center;
+      gap: 8px;
+      border-radius: 999px;
+      padding: 8px 14px;
+      background: linear-gradient(135deg, var(--cyan), var(--violet));
+      color: #fff;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      box-shadow: 0 4px 20px rgba(0,212,255,0.25);
+    }
+
+    .eyebrow.gold {
+      background: linear-gradient(135deg, var(--gold), #e08c10);
+      box-shadow: 0 4px 20px rgba(240,192,64,0.25);
+    }
+
+    h1 {
+      margin-top: 20px;
+      font-size: clamp(48px, 6.5vw, 92px);
+      line-height: 0.90;
+      letter-spacing: -0.07em;
+      font-weight: 900;
+      max-width: 760px;
+    }
+
+    h1 .accent-word {
+      background: linear-gradient(135deg, var(--cyan) 0%, var(--violet) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero-copy {
+      margin-top: 20px;
+      max-width: 580px;
+      color: var(--ink-dim);
+      font-size: 16px;
+      line-height: 1.85;
+    }
+
+    .hero-strip {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-top: 30px;
+    }
+
+    .mini {
+      border-radius: var(--radius-md);
+      background: var(--panel-soft);
+      padding: 16px;
+      border: 1px solid rgba(0,212,255,0.07);
+      transition: border-color 0.2s;
+    }
+
+    .mini:hover { border-color: rgba(0,212,255,0.2); }
+
+    .mini strong {
+      display: block;
+      font-size: 13px;
+      margin-bottom: 6px;
+      color: var(--ink);
+      font-weight: 700;
+    }
+
+    .mini span {
+      font-size: 12px;
+      line-height: 1.6;
+      color: var(--muted);
+    }
+
+    /* Hero side cards */
+    .hero-side { display: grid; gap: 16px; }
+
+    .feature-card {
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      min-height: 185px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      overflow: hidden;
+      border: 1px solid transparent;
+    }
+
+    .feature-card.cyan {
+      background: linear-gradient(145deg, #061a30 0%, #0a2040 100%);
+      border-color: rgba(0,212,255,0.2);
+      box-shadow: inset 0 0 40px rgba(0,212,255,0.05);
+    }
+
+    .feature-card.violet {
+      background: linear-gradient(145deg, #0d0e28 0%, #120f38 100%);
+      border-color: rgba(123,97,255,0.2);
+      box-shadow: inset 0 0 40px rgba(123,97,255,0.05);
+    }
+
+    .feature-card h3 {
+      font-size: 24px;
+      letter-spacing: -0.04em;
+      font-weight: 800;
+    }
+
+    .feature-card.cyan h3 { color: var(--cyan); }
+    .feature-card.violet h3 { color: var(--violet); }
+
+    .feature-card p {
+      margin-top: 10px;
+      line-height: 1.7;
+      font-size: 13.5px;
+      color: var(--ink-dim);
+    }
+
+    .card-tag {
+      align-self: flex-end;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 5px 10px;
+      border-radius: 999px;
+    }
+
+    .feature-card.cyan .card-tag {
+      color: var(--cyan);
+      background: rgba(0,212,255,0.1);
+      border: 1px solid rgba(0,212,255,0.2);
+    }
+
+    .feature-card.violet .card-tag {
+      color: var(--violet);
+      background: rgba(123,97,255,0.1);
+      border: 1px solid rgba(123,97,255,0.2);
+    }
+
+    /* ─── SECTION GRID ─── */
+    .section-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    .section-grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+
+    .section-head {
+      margin-bottom: 20px;
+    }
+
+    .section-head h2 {
+      font-size: 28px;
+      letter-spacing: -0.05em;
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+
+    .section-head p {
+      color: var(--muted);
+      line-height: 1.7;
+      font-size: 14px;
+    }
+
+    .section-label {
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--cyan);
+      margin-bottom: 6px;
+      display: block;
+    }
+
+    /* ─── STATUS BADGE ─── */
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 11px;
+      font-weight: 800;
+      margin-top: 8px;
+    }
+
+    .status-badge.healthy {
+      background: rgba(52,211,153,0.1);
+      border: 1px solid rgba(52,211,153,0.25);
+      color: var(--green);
+    }
+
+    .status-badge.loading {
+      background: rgba(90,112,144,0.12);
+      border: 1px solid rgba(90,112,144,0.2);
+      color: var(--muted);
+    }
+
+    .status-badge.error {
+      background: rgba(248,113,113,0.08);
+      border: 1px solid rgba(248,113,113,0.2);
+      color: #f87171;
+    }
+
+    /* ─── METRICS ─── */
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+
+    .metric {
+      background: var(--panel-soft);
+      border-radius: var(--radius-md);
+      padding: 18px;
+      border: 1px solid rgba(0,212,255,0.06);
+      transition: border-color 0.2s, transform 0.2s;
+      cursor: default;
+    }
+
+    .metric:hover {
+      border-color: rgba(0,212,255,0.18);
+      transform: translateY(-1px);
+    }
+
+    .metric-label {
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      font-size: 10px;
+      color: var(--muted);
+      font-weight: 800;
+      margin-bottom: 10px;
+    }
+
+    .metric-value {
+      font-size: 28px;
+      letter-spacing: -0.05em;
+      font-weight: 900;
+      line-height: 1;
+      color: var(--ink);
+    }
+
+    .metric-value.is-loading {
+      color: var(--muted);
+      font-size: 20px;
+      font-style: italic;
+      font-weight: 400;
+      animation: shimmer 1.5s ease-in-out infinite;
+    }
+
+    @keyframes shimmer {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .metric-meta {
+      margin-top: 10px;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.5;
+      word-break: break-word;
+    }
+
+    .meta-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 16px;
+      color: var(--muted);
+      font-size: 12px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* ─── TERMINAL / FEED ─── */
+    .feed {
+      background: #020c1a;
+      border: 1px solid rgba(0,212,255,0.10);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12.5px;
+      line-height: 2;
+      color: #7baacc;
+      min-height: 280px;
+      white-space: pre-wrap;
+      position: relative;
+    }
+
+    .feed::before {
+      content: '● ● ●';
+      display: block;
+      color: var(--muted);
+      font-size: 10px;
+      margin-bottom: 14px;
+      letter-spacing: 4px;
+    }
+
+    /* ─── STAT CARDS (big numbers) ─── */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+    }
+
+    .stat-card {
+      background: var(--panel-soft);
+      border-radius: var(--radius-lg);
+      padding: 22px 18px;
+      border: 1px solid rgba(0,212,255,0.07);
+      text-align: center;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+
+    .stat-card:hover {
+      border-color: rgba(0,212,255,0.2);
+      transform: translateY(-2px);
+    }
+
+    .stat-num {
+      font-size: 34px;
+      font-weight: 900;
+      letter-spacing: -0.06em;
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+
+    .stat-num.cyan { color: var(--cyan); }
+    .stat-num.violet { color: var(--violet); }
+    .stat-num.gold { color: var(--gold); }
+    .stat-num.green { color: var(--green); }
+
+    .stat-label {
+      font-size: 11px;
+      color: var(--muted);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    /* ─── CARDS ─── */
+    .cards { display: grid; gap: 12px; }
+
+    .card {
+      background: var(--panel-soft);
+      border-radius: var(--radius-lg);
+      padding: 18px 20px;
+      border: 1px solid rgba(0,212,255,0.06);
+      transition: border-color 0.2s;
+    }
+
+    .card:hover { border-color: rgba(0,212,255,0.16); }
+
+    .card-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .card-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      flex-shrink: 0;
+    }
+
+    .card-icon.cyan { background: rgba(0,212,255,0.1); }
+    .card-icon.violet { background: rgba(123,97,255,0.1); }
+    .card-icon.gold { background: rgba(240,192,64,0.1); }
+    .card-icon.green { background: rgba(52,211,153,0.1); }
+
+    .card h4 {
+      font-size: 16px;
+      letter-spacing: -0.03em;
+      font-weight: 800;
+      color: var(--ink);
+    }
+
+    .card p {
+      color: var(--muted);
+      line-height: 1.7;
+      font-size: 13px;
+    }
+
+    .card ul {
+      padding-left: 16px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.8;
+    }
+
+    /* ─── INVESTOR STRIP ─── */
+    .investor-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .investor-pill {
+      border-radius: 999px;
+      padding: 8px 14px;
+      font-size: 12px;
+      font-weight: 700;
+      background: var(--panel-soft);
+      border: 1px solid rgba(0,212,255,0.08);
+      color: var(--ink-dim);
+      transition: 0.2s;
+    }
+
+    .investor-pill:hover {
+      border-color: rgba(0,212,255,0.2);
+      color: var(--cyan);
+    }
+
+    /* ─── LINK GRID ─── */
+    .link-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .link-grid a {
+      text-decoration: none;
+      color: var(--ink-dim);
+      border-radius: 999px;
+      background: var(--panel-soft);
+      border: 1px solid rgba(0,212,255,0.08);
+      padding: 9px 16px;
+      font-size: 12px;
+      font-weight: 700;
+      transition: 0.2s ease;
+    }
+
+    .link-grid a:hover {
+      transform: translateY(-1px);
+      background: rgba(0,212,255,0.08);
+      border-color: rgba(0,212,255,0.25);
+      color: var(--cyan);
+    }
+
+    /* ─── TECH ARCHITECTURE PANEL ─── */
+    .arch-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 4px;
+    }
+
+    .arch-item {
+      background: var(--panel-mid);
+      border-radius: var(--radius-sm);
+      padding: 14px 16px;
+      border: 1px solid rgba(0,212,255,0.06);
+    }
+
+    .arch-item-label {
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 4px;
+    }
+
+    .arch-item-label.cyan { color: var(--cyan); }
+    .arch-item-label.violet { color: var(--violet); }
+    .arch-item-label.gold { color: var(--gold); }
+    .arch-item-label.green { color: var(--green); }
+
+    .arch-item-val {
+      font-size: 13.5px;
+      font-weight: 700;
+      color: var(--ink);
+      margin-bottom: 3px;
+    }
+
+    .arch-item-desc {
+      font-size: 11.5px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    /* ─── DIVIDER ─── */
+    .divider {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(0,212,255,0.15), transparent);
+      margin: 4px 0;
+    }
+
+    /* ─── SIGNATURE ─── */
+    .signature {
+      text-align: center;
+      padding: 10px 0 18px;
+      font-size: 14px;
+      color: var(--muted);
+      font-weight: 600;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 0.03em;
+    }
+
+    .signature strong {
+      background: linear-gradient(135deg, var(--cyan), var(--violet));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      font-weight: 900;
+    }
+
+    /* ─── PROS TOKEN BANNER ─── */
+    .token-banner {
+      background:
+        radial-gradient(ellipse at left, rgba(240,192,64,0.08) 0%, transparent 60%),
+        radial-gradient(ellipse at right, rgba(123,97,255,0.08) 0%, transparent 60%),
+        var(--panel);
+      border: 1px solid rgba(240,192,64,0.15);
+      border-radius: var(--radius-xl);
+      padding: 28px 30px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .token-left h2 {
+      font-size: 26px;
+      font-weight: 900;
+      letter-spacing: -0.05em;
+      margin-bottom: 6px;
+    }
+
+    .token-left p {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.6;
+      max-width: 480px;
+    }
+
+    .token-stats {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .token-stat {
+      text-align: center;
+      padding: 14px 20px;
+      background: rgba(240,192,64,0.07);
+      border: 1px solid rgba(240,192,64,0.15);
+      border-radius: var(--radius-md);
+      min-width: 120px;
+    }
+
+    .token-stat-val {
+      font-size: 22px;
+      font-weight: 900;
+      color: var(--gold);
+      letter-spacing: -0.04em;
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+
+    .token-stat-label {
+      font-size: 10px;
+      color: var(--muted);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    /* ─── RESPONSIVE ─── */
+    @media (max-width: 1100px) {
+      .hero,
+      .section-grid,
+      .section-grid-3,
+      .stat-grid,
+      .arch-grid {
+        grid-template-columns: 1fr;
+      }
+      .metrics { grid-template-columns: 1fr 1fr; }
+      .token-banner { flex-direction: column; }
+      body { padding: 12px; }
+      .panel { padding: 22px; }
+    }
+
+    @media (max-width: 600px) {
+      .metrics { grid-template-columns: 1fr; }
+      .hero-strip { grid-template-columns: 1fr; }
+      .token-stats { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+
+    <!-- TOPBAR -->
+    <div class="topbar">
+      <div class="brand">
+        <div class="brand-mark"></div>
+        <div>
+          <div>Pharos Network</div>
+          <div class="brand-sub">Pacific Ocean Mainnet</div>
+        </div>
+      </div>
+      <div class="top-pills">
+        <div class="pill live">Public Mainnet Live</div>
+        <div class="pill">$52M Raised</div>
+        <div class="pill">50K TPS</div>
+        <div class="pill">EVM + WASM</div>
+        <div class="pill">No Wallet Required</div>
+      </div>
+    </div>
+
+    <!-- HERO -->
+    <section class="hero">
+      <div class="panel hero-main">
+        <div>
+          <div class="eyebrow">⚓ Pacific Ocean Mainnet — Live</div>
+          <h1>
+            The <span class="accent-word">Financial</span><br />
+            Layer One.
+          </h1>
+          <div class="hero-copy">
+            Pharos is a full-stack parallel L1 blockchain engineered for real-world assets, institutional DeFi, and the next wave of on-chain finance. Founded by ex-Ant Financial and Alibaba leaders — built to bridge TradFi and Web3 at internet scale.
+          </div>
+        </div>
+        <div class="hero-strip">
+          <div class="mini">
+            <strong>Subsecond Finality</strong>
+            <span>Async BFT consensus with deep parallelism, targeting DP4/DP5 throughput.</span>
+          </div>
+          <div class="mini">
+            <strong>RealFi Native</strong>
+            <span>Built for RWA tokenization, stablecoin rails, and institutional-grade compliance.</span>
+          </div>
+          <div class="mini">
+            <strong>Live RPC Reads</strong>
+            <span>Dashboard pulls live data from public mainnet and testnet endpoints.</span>
+          </div>
+        </div>
+      </div>
+      <div class="hero-side">
+        <div class="feature-card cyan">
+          <div>
+            <h3>Live Chain Pulse</h3>
+            <p>Real-time block height, gas price, and chain IDs pulled from public Pharos RPC endpoints — no wallet needed.</p>
+          </div>
+          <span class="card-tag">RPC Live</span>
+        </div>
+        <div class="feature-card violet">
+          <div>
+            <h3>SPNs + Chainlink CCIP</h3>
+            <p>Special Processing Networks for heterogeneous compute, with Chainlink CCIP as canonical cross-chain messaging infrastructure since Oct 2025.</p>
+          </div>
+          <span class="card-tag">Interop Layer</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ECOSYSTEM STATS -->
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-num cyan">50K</div>
+        <div class="stat-label">Target TPS (EVM L1)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num gold">$52M</div>
+        <div class="stat-label">Total Funding Raised</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num violet">131M+</div>
+        <div class="stat-label">Unique Addresses (Testnet)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num green">1.26B</div>
+        <div class="stat-label">Cumulative Transactions</div>
+      </div>
+    </div>
+
+    <!-- NETWORK PULSE + LIVE FEED -->
+    <section class="section-grid">
+      <div class="panel">
+        <div class="section-head">
+          <span class="section-label">Live RPC</span>
+          <h2>Network Pulse</h2>
+          <p>Live reads from Pharos mainnet and Atlantic testnet public RPC endpoints. Auto-refreshes every 20 seconds.</p>
+          <div id="rpcStatus" class="status-badge loading">● loading live data</div>
+        </div>
+        <div class="metrics">
+          <div class="metric">
+            <div class="metric-label">Mainnet Block</div>
+            <div class="metric-value is-loading" id="mainnetBlock">fetching…</div>
+            <div class="metric-meta">Chain ID: <span id="mainnetChain">—</span></div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">Testnet Block</div>
+            <div class="metric-value is-loading" id="testnetBlock">fetching…</div>
+            <div class="metric-meta">Chain ID: <span id="testnetChain">—</span></div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">Mainnet Gas</div>
+            <div class="metric-value is-loading" id="mainnetGas">fetching…</div>
+            <div class="metric-meta">rpc.pharos.xyz</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">Testnet Gas</div>
+            <div class="metric-value is-loading" id="testnetGas">fetching…</div>
+            <div class="metric-meta">atlantic.dplabs-internal.com</div>
+          </div>
+        </div>
+        <div class="meta-row">
+          <span>refresh: 20s</span>
+          <span id="lastUpdated">waiting for first fetch…</span>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="section-head">
+          <span class="section-label">Terminal</span>
+          <h2>Live Feed</h2>
+          <p>Operational output from the RPC probe layer.</p>
+        </div>
+        <div class="feed" id="terminalFeed">[boot] Pharos Alpha — IsoBaraSAM build
+[init] connecting to mainnet + testnet RPCs…
+[wait] standing by for first data pull…</div>
+      </div>
+    </section>
+
+    <!-- PROS TOKEN BANNER -->
+    <div class="token-banner">
+      <div class="token-left">
+        <div class="eyebrow gold">$PROS Token — Live</div>
+        <h2 style="margin-top:14px;">Native Token of Pharos</h2>
+        <p>Genesis supply fixed at 1 billion PROS. Launched December 12, 2025. Powers staking, governance, fee payments, RWA collateral, and on-chain asset access across the Pharos ecosystem.</p>
+      </div>
+      <div class="token-stats">
+        <div class="token-stat">
+          <div class="token-stat-val">1B</div>
+          <div class="token-stat-label">Genesis Supply</div>
+        </div>
+        <div class="token-stat">
+          <div class="token-stat-val">5%</div>
+          <div class="token-stat-label">Annual Staking APY (Mo. 7+)</div>
+        </div>
+        <div class="token-stat">
+          <div class="token-stat-val">16%</div>
+          <div class="token-stat-label">OKX Wallet Campaign APY</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CORE PRIMITIVES + BUILD ANGLES -->
+    <section class="section-grid">
+      <div class="panel">
+        <div class="section-head">
+          <span class="section-label">Tech Stack</span>
+          <h2>Core Primitives</h2>
+          <p>The technical substrate that makes Pharos genuinely different from generic EVM chains.</p>
+        </div>
+        <div class="cards">
+          <div class="card">
+            <div class="card-head">
+              <div class="card-icon cyan">⚡</div>
+              <h4>x402 Payment Rails</h4>
+            </div>
+            <p>Micropayment infrastructure for pay-per-use APIs, agent-native commerce, and programmable machine-to-machine payment flows.</p>
+          </div>
+          <div class="card">
+            <div class="card-head">
+              <div class="card-icon violet">🔗</div>
+              <h4>Circle CCTP + Chainlink CCIP</h4>
+            </div>
+            <p>Native USDC cross-chain transfer via CCTP (domain 31), with Chainlink CCIP adopted as canonical cross-chain messaging and Chainlink Data Streams for RWA market data.</p>
+          </div>
+          <div class="card">
+            <div class="card-head">
+              <div class="card-icon gold">🧩</div>
+              <h4>SPNs — Special Processing Networks</h4>
+            </div>
+            <p>Modular heterogeneous compute extensions with TEE support, multi-party computation, and cross-SPN interoperability for privacy-enhanced financial workloads.</p>
+          </div>
+          <div class="card">
+            <div class="card-head">
+              <div class="card-icon green">🖥️</div>
+              <h4>Dual VM: EVM + WASM (PVM)</h4>
+            </div>
+            <p>Pharos Virtual Machine supports both EVM and WASM execution with parallel transaction processing — reducing congestion without sacrificing compatibility.</p>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="section-head">
+          <span class="section-label">Opportunities</span>
+          <h2>Build Angles</h2>
+          <p>Where Pharos's architecture creates real competitive wedges for builders.</p>
+        </div>
+        <div class="cards">
+          <div class="card">
+            <div class="card-head">
+              <div class="card-icon cyan">🤖</div>
+              <h4>Agent Commerce Surface</h4>
+            </div>
+            <p>Usage-based API billing, stablecoin settlement patterns, and autonomous machine-to-machine payment flows built natively around x402.</p>
+          </div>
+          <div class="card">
+            <div class="card-head">
+              <div class="card-icon gold">🏦</div>
+              <h4>RWA Tokenization Layer</h4>
+            </div>
+            <p>Commodities, real estate, debt instruments, and institutional-grade assets tokenized on an EVM chain purpose-built for compliance and high throughput.</p>
+          </div>
+          <div class="card">
+            <div class="card-head">
+              <div class="card-icon violet">🌐</div>
+              <h4>Cross-Chain Settlement Infra</h4>
+            </div>
+            <p>CCTP + CCIP combined with SPNs and relayer node networks enables enterprise payment corridors and high-volume cross-chain financial workflows.</p>
+          </div>
+          <div class="card">
+            <div class="card-head">
+              <div class="card-icon green">📊</div>
+              <h4>TradFi → DeFi Bridge</h4>
+            </div>
+            <p>Pharos explicitly targets Asian institutional capital and regulated financial entities — a rare onramp for builders bridging legacy finance into on-chain infrastructure.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ARCHITECTURE DEEP DIVE -->
+    <div class="panel">
+      <div class="section-head">
+        <span class="section-label">Architecture</span>
+        <h2>How Pharos Is Actually Built</h2>
+        <p>A layered parallelism model addressing throughput, storage, and extensibility simultaneously — designed to target DP4/DP5 degree of parallelism.</p>
+      </div>
+      <div class="arch-grid">
+        <div class="arch-item">
+          <div class="arch-item-label cyan">L1-Core</div>
+          <div class="arch-item-val">Decentralized High-Throughput Chain</div>
+          <div class="arch-item-desc">Subsecond finality via Asynchronous BFT consensus. Parallel transaction execution with full lifecycle async pipelining.</div>
+        </div>
+        <div class="arch-item">
+          <div class="arch-item-label violet">L1-Base</div>
+          <div class="arch-item-val">Hardware-Accelerated Data Availability</div>
+          <div class="arch-item-desc">High-performance data availability layer with Parallel Merklization and real-time verification for seamless TradFi integration.</div>
+        </div>
+        <div class="arch-item">
+          <div class="arch-item-label gold">L1-Extension (SPNs)</div>
+          <div class="arch-item-val">Special Processing Networks</div>
+          <div class="arch-item-desc">Pluggable heterogeneous compute layer. Enables privacy-enhanced computing, native restaking, and cross-SPN interoperability.</div>
+        </div>
+        <div class="arch-item">
+          <div class="arch-item-label green">PVM + Dual Execution</div>
+          <div class="arch-item-val">EVM + WASM Runtime</div>
+          <div class="arch-item-desc">Pharos Virtual Machine runs both EVM and WASM. Parallel Merklization + Indexed storage enables real-time asset verification.</div>
+        </div>
+        <div class="arch-item">
+          <div class="arch-item-label cyan">Consensus</div>
+          <div class="arch-item-val">Async BFT — DP4 Target</div>
+          <div class="arch-item-desc">Five-tier Degree of Parallelism model. DP4 combines scalable consensus, parallel execution, async pipelining, and high-performance authenticated storage.</div>
+        </div>
+        <div class="arch-item">
+          <div class="arch-item-label violet">Cross-Chain</div>
+          <div class="arch-item-val">Chainlink CCIP + Circle CCTP</div>
+          <div class="arch-item-desc">CCIP is the canonical cross-chain messaging layer. CCTP domain 31 handles native USDC burn-and-mint. Chainlink Data Streams supply RWA market feeds.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FUNDING + REFERENCES -->
+    <section class="section-grid">
+      <div class="panel">
+        <div class="section-head">
+          <span class="section-label">Backing</span>
+          <h2>Who's Behind It</h2>
+          <p>$52M raised across seed and Series A. Institutional pedigree from both crypto-native and traditional finance worlds.</p>
+        </div>
+        <div class="cards">
+          <div class="card">
+            <div class="card-head">
+              <div class="card-icon gold">🌱</div>
+              <h4>Seed Round — $8M (Nov 2024)</h4>
+            </div>
+            <p>Led by Lightspeed Faction and Hack VC, with SNZ Capital, Dispersion Capital, Hash Global, Generative Ventures, Chorus One, and others.</p>
+          </div>
+          <div class="card">
+            <div class="card-head">
+              <div class="card-icon cyan">🚀</div>
+              <h4>Series A — $44M (Apr 2026)</h4>
+            </div>
+            <p>Led by undisclosed top institutions including Asian PE funds and Hong Kong compliant financial entities. Sumitomo Corporation Group, SNZ Capital, Chainlink, and Flow Traders participated.</p>
+          </div>
+        </div>
+        <div style="margin-top:16px;">
+          <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;font-weight:800;margin-bottom:10px;">Key Investors</div>
+          <div class="investor-strip">
+            <span class="investor-pill">Lightspeed Faction</span>
+            <span class="investor-pill">Hack VC</span>
+            <span class="investor-pill">Sumitomo Corp</span>
+            <span class="investor-pill">Chainlink</span>
+            <span class="investor-pill">Flow Traders</span>
+            <span class="investor-pill">SNZ Capital</span>
+            <span class="investor-pill">Chorus One</span>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="section-head">
+          <span class="section-label">Resources</span>
+          <h2>Useful References</h2>
+          <p>Fast access into the Pharos ecosystem's public surfaces, tooling, and docs.</p>
+        </div>
+        <div class="cards">
+          <div class="card">
+            <h4 style="margin-bottom:10px;font-size:14px;">RPC Endpoints</h4>
+            <ul>
+              <li>Mainnet: <code style="color:var(--cyan);font-family:'JetBrains Mono',monospace;font-size:11px;">https://rpc.pharos.xyz</code></li>
+              <li>Testnet: <code style="color:var(--violet);font-family:'JetBrains Mono',monospace;font-size:11px;">https://atlantic.dplabs-internal.com</code></li>
+            </ul>
+          </div>
+          <div class="card">
+            <h4 style="margin-bottom:10px;font-size:14px;">Explorer + Chain Info</h4>
+            <ul>
+              <li>PharosScan — Mainnet explorer</li>
+              <li>Atlantic PharosScan — Testnet explorer</li>
+              <li>SocialScan — Alternative explorer surface</li>
+              <li>CCTP Domain ID: <strong style="color:var(--gold);">31</strong></li>
+            </ul>
+          </div>
+        </div>
+        <div class="link-grid">
+          <a href="https://pharos.xyz" target="_blank">Main Site</a>
+          <a href="https://pharos.xyz/devhub" target="_blank">DevHub</a>
+          <a href="https://docs.pharos.xyz" target="_blank">Docs</a>
+          <a href="https://testnet.pharosnetwork.xyz/" target="_blank">Testnet</a>
+          <a href="https://www.pharosscan.xyz" target="_blank">Mainnet Explorer</a>
+          <a href="https://atlantic.pharosscan.xyz/" target="_blank">Testnet Explorer</a>
+          <a href="https://pharos.socialscan.io/" target="_blank">SocialScan</a>
+        </div>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- SIGNATURE -->
+    <div class="signature">
+      ⚓ Built for the Pharos Ecosystem &nbsp;·&nbsp; <strong>IsoBaraSAM</strong>
+    </div>
+
+  </div>
+
+  <script>
+    const ENDPOINTS = {
+      mainnet: 'https://rpc.pharos.xyz',
+      testnet: 'https://atlantic.dplabs-internal.com'
+    };
+
+    const terminalEl = document.getElementById('terminalFeed');
+    const statusEl   = document.getElementById('rpcStatus');
+    const lastUpdEl  = document.getElementById('lastUpdated');
+
+    function now() {
+      return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+
+    function hexToInt(hex) { return parseInt(hex, 16); }
+    function weiToGwei(hex) { return (parseInt(hex, 16) / 1e9).toFixed(3) + ' gwei'; }
+
+    function setMetric(id, value) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = value;
+      el.classList.remove('is-loading');
+    }
+
+    function setTerminal(lines) {
+      terminalEl.textContent = lines.join('\n');
+    }
+
+    function setStatus(state, text) {
+      statusEl.className = 'status-badge ' + state;
+      statusEl.textContent = '● ' + text;
+    }
+
+    async function rpcCall(url, method, params = []) {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', method, params, id: 1 })
+      });
+      if (!res.ok) throw new Error(`${method} → HTTP ${res.status}`);
+      const data = await res.json();
+      if (data.error) throw new Error(data.error.message || 'RPC error');
+      return data.result;
+    }
+
+    async function fetchNetwork(url) {
+      const [block, gas, chainId] = await Promise.all([
+        rpcCall(url, 'eth_blockNumber'),
+        rpcCall(url, 'eth_gasPrice'),
+        rpcCall(url, 'net_version')
+      ]);
+      return {
+        block: hexToInt(block).toLocaleString(),
+        gas: weiToGwei(gas),
+        chainId
+      };
+    }
+
+    async function refresh() {
+      const lines = [
+        `[pharos]  IsoBaraSAM build`,
+        `[time]    ${now()}`,
+        `[probe]   pinging mainnet + testnet RPCs…`
+      ];
+      setTerminal(lines);
+      setStatus('loading', 'probing…');
+
+      try {
+        const [mainnet, testnet] = await Promise.all([
+          fetchNetwork(ENDPOINTS.mainnet),
+          fetchNetwork(ENDPOINTS.testnet)
+        ]);
+
+        setMetric('mainnetBlock', mainnet.block);
+        setMetric('testnetBlock', testnet.block);
+        setMetric('mainnetGas',  mainnet.gas);
+        setMetric('testnetGas',  testnet.gas);
+        setMetric('mainnetChain', mainnet.chainId);
+        setMetric('testnetChain', testnet.chainId);
+
+        setStatus('healthy', 'live data healthy');
+        lastUpdEl.textContent = `last sync: ${now()}`;
+
+        lines.push(`[ok]      mainnet ↗ chain ${mainnet.chainId} | block ${mainnet.block} | gas ${mainnet.gas}`);
+        lines.push(`[ok]      testnet ↗ chain ${testnet.chainId} | block ${testnet.block} | gas ${testnet.gas}`);
+        lines.push(`[note]    public RPC surfaces stable for builder tooling`);
+        lines.push(`[scope]   RWAs · x402 payments · Chainlink CCIP · SPNs · $PROS staking`);
+        lines.push(`[net]     50K TPS target · EVM + WASM · DP4 parallelism · subsecond finality`);
+        lines.push(`[pulse]   Pacific Ocean Mainnet is live. ⚓`);
+        setTerminal(lines);
+
+      } catch (err) {
+        setStatus('error', 'endpoint degraded');
+        lastUpdEl.textContent = `last attempt: ${now()}`;
+        lines.push(`[err]     ${err.message}`);
+        lines.push(`[warn]    RPC read failed — rest of dashboard is still valid as ecosystem reference`);
+        setTerminal(lines);
+      }
+    }
+
+    refresh();
+    setInterval(refresh, 20000);
+  </script>
+</body>
+</html>
